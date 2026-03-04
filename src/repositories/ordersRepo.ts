@@ -34,6 +34,8 @@ export type OrdersResponse = {
 
 export async function listOrders(_q: OrdersQuery): Promise<OrdersResponse> {
   // TODO (candidato):
+  if (_q.status!='all')
+    getOrdersDb()
   // 1) Obtener data desde getOrdersDb()
   // 2) Aplicar filtros:
   //    - status (si != 'all')
