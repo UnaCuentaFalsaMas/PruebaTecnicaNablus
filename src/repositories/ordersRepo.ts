@@ -33,42 +33,101 @@ export type OrdersResponse = {
 };
 
 export async function listOrders(_q: OrdersQuery): Promise<OrdersResponse> {
+  // TODO (candidato):
+// 1) Obtener data desde getOrdersDb()
+// 2) Aplicar filtros:
+//    - status (si != 'all')
+//    - q: buscar en id/customerName/customerRut (case-insensitive)
+//    - from/to: issuedAt inclusivo (YYYY-MM-DD)
+// 3) Mapear a OrderRow calculando vat/total con calcTotals()
+// 4) Ordenar por issuedAt o total + dir asc/desc
+// 5) Armar summary:
+//    - count
+//    - totalNet, totalVat, totalGross
+//    - byStatus: conteo por cada estado
+
   const { q, status, from, to, sort = "issuedAt", dir = "desc" } = _q;
   const db = getOrdersDb();
-  const filtrado=db.filter((orden)=>{
-      if (q){
-    const busqueda=q.toLowerCase();
-    const match= orden.id.toLowerCase.includes(busqueda)||orden.customerName.toLowerCase().includes(busqueda)|| orden.customerRut.toLowerCase().includes(busqueda);
 
+  const filtrado = db.filter((orden) => {
+    if (status && status !== "all" && orden.status !== status) return false;
+    if (q) {
+      const busqueda = q.toUpperCase();
+      const match =
+        orden.id.toUpperCase().includes(busqueda) ||
+        orden.customerName.toUpperCase().includes(busqueda) ||
+        orden.customerRut.toUpperCase().includes(busqueda);
+      if (!match) return false;
     }
-  }
 
-  })
+    const fechaOrden = orden.issuedAt.split("T")[0];
+    if (from && fechaOrden < from) return false;
+    if (to && fechaOrden > to) return false;
 
-  // TODO (candidato):
-  // 1) Obtener data desde getOrdersDb()
-  // 2) Aplicar filtros:
-  //    - status (si != 'all')
-  //    - q: buscar en id/customerName/customerRut (case-insensitive)
-  //    - from/to: issuedAt inclusivo (YYYY-MM-DD)
-  // 3) Mapear a OrderRow calculando vat/total con calcTotals()
-  // 4) Ordenar por issuedAt o total + dir asc/desc
-  // 5) Armar summary:
-  //    - count
-  //    - totalNet, totalVat, totalGross
-  //    - byStatus: conteo por cada estado
+    return true;
+  });
 
-  return {
-    data: [],
-    summary: {
-      count: 0,
+  const rows: OrderRow[] = filtrado.map((order) => {
+    // Asumiendo que calcTotals devuelve { net, vat, total } basándose en order.items
+    const totals = calcTotals(order);
+    const net = order.net
+    return {
+      id: order.id,
+      customerName: order.customerName,
+      customerRut: order.customerRut,
+      issuedAt: order.issuedAt,
+      status: order.status,
+      net,
+      ...totals,
+    };
+  });
+
+  rows.sort((a, b) => {
+    const valA = a[sort];
+    const valB = b[sort];
+
+    if (valA < valB) return dir === "asc" ? -1 : 1;
+    if (valA > valB) return dir === "asc" ? 1 : -1;
+    return 0;
+  });
+//   return {
+//     data: [],
+//     summary: {
+//       count: 0,
+//       totalNet: 0,
+//       totalVat: 0,
+//       totalGross: 0,
+//       byStatus: { pending: 0, paid: 0, canceled: 0 },
+//     },
+//   };
+// }
+
+  const summary = rows.reduce(
+    (acc, row) => {
+      acc.totalNet += row.net;
+      acc.totalVat += row.vat;
+      acc.totalGross += row.total;
+      acc.byStatus[row.status]++;
+      return acc;
+    },
+    {
+      count: rows.length,
       totalNet: 0,
       totalVat: 0,
       totalGross: 0,
       byStatus: { pending: 0, paid: 0, canceled: 0 },
-    },
+    }
+  );
+
+  return {
+    data: rows,
+    summary,
   };
 }
+
+
+
+
 
 
 
