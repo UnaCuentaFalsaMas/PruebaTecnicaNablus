@@ -33,9 +33,19 @@ export type OrdersResponse = {
 };
 
 export async function listOrders(_q: OrdersQuery): Promise<OrdersResponse> {
+  const { q, status, from, to, sort = "issuedAt", dir = "desc" } = _q;
+  const db = getOrdersDb();
+  const filtrado=db.filter((orden)=>{
+      if (q){
+    const busqueda=q.toLowerCase();
+    const match= orden.id.toLowerCase.includes(busqueda)||orden.customerName.toLowerCase().includes(busqueda)|| orden.customerRut.toLowerCase().includes(busqueda);
+
+    }
+  }
+
+  })
+
   // TODO (candidato):
-  if (_q.status!='all')
-    getOrdersDb()
   // 1) Obtener data desde getOrdersDb()
   // 2) Aplicar filtros:
   //    - status (si != 'all')
